@@ -1,6 +1,7 @@
 package main
 
 import (
+	"analyzer/datasource"
 	"database/sql"
 	"fmt"
 	"github.com/Masterminds/semver"
@@ -10,70 +11,21 @@ import (
 )
 
 func main() {
-	if err := haldler(); err != nil {
+	if err := handler(); err != nil {
 		log.Fatal(err)
 	}
 }
 
-type ReleaseLog struct {
-	ProjectId              string  `json:"project_id"`
-	ProjectName            string  `json:"project_name"`
-	VersionId              string  `json:"version_id"`
-	VersionNumber          string  `json:"version_number"`
-	DependencyRequirements *string `json:"dependency_requirements"`
-	PublishedTimestamp     string  `json:"published_timestamp"`
-	PackageType            string  `json:"type"`
-}
-
-func haldler() error {
+func handler() error {
 	db, err := sql.Open("mysql", "root@(localhost:3306)/lib")
 	if err != nil {
 		return err
 	}
 
-	err = db.Ping()
+	releaseLogs, err := datasource.FetchReleases(db, "30786", "31296")
 	if err != nil {
 		return err
 	}
-
-	rows, err := db.Query(`
-	-- 脆弱性を持つパッケージと、脆弱性を持つパッケージに依存するパッケージのバージョン履歴をマージしてソート
-	-- TODO: 脆弱性を持つパッケージの方のバージョンを動的に解決する必要がある(プログラム言語で書いたほうが良さそう)
-	SELECT d.project_id,d.project_name,d.version_id,v.number AS version_number,d.dependency_requirements,
-		   v.published_timestamp, 'package' AS type
-	FROM dependencies_cargo d
-	INNER JOIN versions_cargo v ON d.version_id=v.id
-	WHERE d.dependency_project_id=31296 AND d.project_id=30786
-	UNION ALL
-	SELECT v.project_id, v.project_name, v.id AS version_id, v.number AS version_number, NULL AS dependency_requirements,
-		   v.published_timestamp, 'vul_package' AS type
-	FROM versions_cargo v
-	WHERE v.project_id=31296
-	ORDER BY published_timestamp;
-	`)
-	defer rows.Close()
-
-	// リリース履歴を時系列で取得
-	releaseLogs := make([]ReleaseLog, 0)
-	for rows.Next() {
-		var releaseLog ReleaseLog
-
-		err := rows.Scan(
-			&releaseLog.ProjectId,
-			&releaseLog.ProjectName,
-			&releaseLog.VersionId,
-			&releaseLog.VersionNumber,
-			&releaseLog.DependencyRequirements,
-			&releaseLog.PublishedTimestamp,
-			&releaseLog.PackageType,
-		)
-		if err != nil {
-			return err
-		}
-
-		releaseLogs = append(releaseLogs, releaseLog)
-	}
-	//fmt.Printf("%#v", releaseLogs)
 
 	// 脆弱性の影響を受けていた期間を特定
 	// 変数: 脆弱性の始まりと終わりのバージョン
@@ -116,7 +68,7 @@ func haldler() error {
 			isAlreadyPublishedPackage = true
 		} else if releaseLog.PackageType == "vul_package" {
 			// 依存先のパッケージ(脆弱性を発生させたパッケージ)
-			// beforeReleaseには自分も入れる必要がある
+			// beforeReleaseには自分のリリースも入れる必要がある
 			isAffectedVulnerability, err := isAffectedVulnerabilityWithVulPackage(isAlreadyPublishedPackage, releaseLogs[0:i+1])
 			if err != nil {
 				return err
@@ -161,7 +113,7 @@ const (
 	vulConstraint = "0.1.6 - 0.1.9"
 )
 
-func findLatestPackageDependencyRequirements(beforeReleases []ReleaseLog) (string, error) {
+func findLatestPackageDependencyRequirements(beforeReleases []datasource.ReleaseLog) (string, error) {
 	for i := len(beforeReleases) - 1; i >= 0; i-- {
 		if beforeReleases[i].PackageType == "package" {
 			return *beforeReleases[i].DependencyRequirements, nil
@@ -170,7 +122,7 @@ func findLatestPackageDependencyRequirements(beforeReleases []ReleaseLog) (strin
 	return "", fmt.Errorf("最新の依存関係制約が見つかりませんでした")
 }
 
-func isAffectedVulnerabilityWithVulPackage(isAlreadyPublishedPackage bool, beforeReleases []ReleaseLog) (bool, error) {
+func isAffectedVulnerabilityWithVulPackage(isAlreadyPublishedPackage bool, beforeReleases []datasource.ReleaseLog) (bool, error) {
 	if !isAlreadyPublishedPackage {
 		return false, nil
 	}
@@ -213,7 +165,7 @@ func isAffectedVulnerabilityWithVulPackage(isAlreadyPublishedPackage bool, befor
 	return false, fmt.Errorf("制約を満たすバージョンが見つかりませんでした. 制約: '%s'", requirements)
 }
 
-func isAffectedVulnerabilityWithPackage(requirements string, beforeReleases []ReleaseLog) (bool, error) {
+func isAffectedVulnerabilityWithPackage(requirements string, beforeReleases []datasource.ReleaseLog) (bool, error) {
 	for i := len(beforeReleases) - 1; i >= 0; i-- {
 		// 最新から順に制約を満たすかどうか確認する
 		if beforeReleases[i].PackageType == "vul_package" {
