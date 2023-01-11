@@ -18,7 +18,7 @@ func main() {
 }
 
 const (
-	vulConstraint = "0.1.6 - 0.1.9"
+	vulConstraint = "0.1.2 - 0.6.1"
 	vulPackageId  = "31296"
 )
 
