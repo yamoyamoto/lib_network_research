@@ -2,9 +2,7 @@ package datasource
 
 import (
 	"analyzer/models"
-	"bytes"
 	"database/sql"
-	"text/template"
 )
 
 const (
@@ -23,25 +21,11 @@ ORDER BY published_timestamp;
 `
 )
 
-func buildMerge2PackageReleases(packageId string, vulPackageId string) (string, error) {
-	tpl, err := template.New("").Parse(mergeTwoPackageReleasesTemplate)
-	if err != nil {
-		return "", err
-	}
-
-	buf := new(bytes.Buffer)
-	if err := tpl.Execute(buf, map[string]string{
+func FetchMergedTwoPackageReleasesWithSort(db *sql.DB, packageId string, vulPackageId string) ([]models.ReleaseLog, error) {
+	sqlString, err := buildStringWithParamsFromTemplate(mergeTwoPackageReleasesTemplate, map[string]string{
 		"packageId":    packageId,
 		"vulPackageId": vulPackageId,
-	}); err != nil {
-		return "", err
-	}
-
-	return buf.String(), nil
-}
-
-func FetchReleases(db *sql.DB, packageId string, vulPackageId string) ([]models.ReleaseLog, error) {
-	sqlString, err := buildMerge2PackageReleases(packageId, vulPackageId)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +34,12 @@ func FetchReleases(db *sql.DB, packageId string, vulPackageId string) ([]models.
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(rows)
 
 	// リリース履歴を時系列で取得
 	releaseLogs := make([]models.ReleaseLog, 0)

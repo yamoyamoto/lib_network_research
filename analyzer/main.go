@@ -17,13 +17,37 @@ func main() {
 	}
 }
 
+const (
+	vulConstraint = "0.1.6 - 0.1.9"
+	vulPackageId  = "31296"
+)
+
 func handler() error {
 	db, err := sql.Open("mysql", "root@(localhost:3306)/lib")
 	if err != nil {
 		return err
 	}
 
-	releaseLogs, err := datasource.FetchReleases(db, "30786", "31296")
+	// vulPackageに依存しているパッケージを全て取得
+	packages, err := datasource.FetchAffectedPackagesFromVulPackage(db, vulPackageId)
+	if err != nil {
+		return err
+	}
+	log.Printf("脆弱性を持ったパッケージ(%s)に依存しているパッケージが %d 個見つかりました", vulPackageId, len(packages))
+
+	for _, p := range packages {
+		log.Printf("↓package %s の解析結果↓", p.ProjectId)
+		if err := analyzeVulnerabilityDuration(db, p.ProjectId, "31296"); err != nil {
+			return err
+		}
+		print("\n\n")
+	}
+
+	return nil
+}
+
+func analyzeVulnerabilityDuration(db *sql.DB, packageId string, vulPackageId string) error {
+	releaseLogs, err := datasource.FetchMergedTwoPackageReleasesWithSort(db, packageId, vulPackageId)
 	if err != nil {
 		return err
 	}
@@ -109,10 +133,6 @@ func handler() error {
 
 	return nil
 }
-
-const (
-	vulConstraint = "0.1.6 - 0.1.9"
-)
 
 func findLatestPackageDependencyRequirements(beforeReleases []models.ReleaseLog) (string, error) {
 	for i := len(beforeReleases) - 1; i >= 0; i-- {
