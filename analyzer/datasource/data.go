@@ -1,6 +1,7 @@
 package datasource
 
 import (
+	"analyzer/models"
 	"bytes"
 	"database/sql"
 	"text/template"
@@ -22,16 +23,6 @@ ORDER BY published_timestamp;
 `
 )
 
-type ReleaseLog struct {
-	ProjectId              string  `json:"project_id"`
-	ProjectName            string  `json:"project_name"`
-	VersionId              string  `json:"version_id"`
-	VersionNumber          string  `json:"version_number"`
-	DependencyRequirements *string `json:"dependency_requirements"`
-	PublishedTimestamp     string  `json:"published_timestamp"`
-	PackageType            string  `json:"type"`
-}
-
 func buildMerge2PackageReleases(packageId string, vulPackageId string) (string, error) {
 	tpl, err := template.New("").Parse(mergeTwoPackageReleasesTemplate)
 	if err != nil {
@@ -49,7 +40,7 @@ func buildMerge2PackageReleases(packageId string, vulPackageId string) (string, 
 	return buf.String(), nil
 }
 
-func FetchReleases(db *sql.DB, packageId string, vulPackageId string) ([]ReleaseLog, error) {
+func FetchReleases(db *sql.DB, packageId string, vulPackageId string) ([]models.ReleaseLog, error) {
 	sqlString, err := buildMerge2PackageReleases(packageId, vulPackageId)
 	if err != nil {
 		return nil, err
@@ -62,9 +53,9 @@ func FetchReleases(db *sql.DB, packageId string, vulPackageId string) ([]Release
 	defer rows.Close()
 
 	// リリース履歴を時系列で取得
-	releaseLogs := make([]ReleaseLog, 0)
+	releaseLogs := make([]models.ReleaseLog, 0)
 	for rows.Next() {
-		var releaseLog ReleaseLog
+		var releaseLog models.ReleaseLog
 
 		err := rows.Scan(
 			&releaseLog.ProjectId,

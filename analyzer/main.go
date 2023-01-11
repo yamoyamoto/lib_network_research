@@ -2,6 +2,7 @@ package main
 
 import (
 	"analyzer/datasource"
+	"analyzer/models"
 	"database/sql"
 	"fmt"
 	"github.com/Masterminds/semver"
@@ -113,7 +114,7 @@ const (
 	vulConstraint = "0.1.6 - 0.1.9"
 )
 
-func findLatestPackageDependencyRequirements(beforeReleases []datasource.ReleaseLog) (string, error) {
+func findLatestPackageDependencyRequirements(beforeReleases []models.ReleaseLog) (string, error) {
 	for i := len(beforeReleases) - 1; i >= 0; i-- {
 		if beforeReleases[i].PackageType == "package" {
 			return *beforeReleases[i].DependencyRequirements, nil
@@ -122,7 +123,7 @@ func findLatestPackageDependencyRequirements(beforeReleases []datasource.Release
 	return "", fmt.Errorf("最新の依存関係制約が見つかりませんでした")
 }
 
-func isAffectedVulnerabilityWithVulPackage(isAlreadyPublishedPackage bool, beforeReleases []datasource.ReleaseLog) (bool, error) {
+func isAffectedVulnerabilityWithVulPackage(isAlreadyPublishedPackage bool, beforeReleases []models.ReleaseLog) (bool, error) {
 	if !isAlreadyPublishedPackage {
 		return false, nil
 	}
@@ -165,7 +166,7 @@ func isAffectedVulnerabilityWithVulPackage(isAlreadyPublishedPackage bool, befor
 	return false, fmt.Errorf("制約を満たすバージョンが見つかりませんでした. 制約: '%s'", requirements)
 }
 
-func isAffectedVulnerabilityWithPackage(requirements string, beforeReleases []datasource.ReleaseLog) (bool, error) {
+func isAffectedVulnerabilityWithPackage(requirements string, beforeReleases []models.ReleaseLog) (bool, error) {
 	for i := len(beforeReleases) - 1; i >= 0; i-- {
 		// 最新から順に制約を満たすかどうか確認する
 		if beforeReleases[i].PackageType == "vul_package" {
