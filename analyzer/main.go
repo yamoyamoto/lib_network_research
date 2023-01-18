@@ -32,9 +32,27 @@ func handler() error {
 		return err
 	}
 
+	outputFile, err := os.Create("test.csv") // 書き込む先のファイル
+	if err != nil {
+		fmt.Println(err)
+	}
+	w := csv.NewWriter(outputFile)
+	if err := w.Write([]string{
+		"project_id",
+		"vul_project_id",
+		"vul_start_datetime",
+		"vul_end_datetime",
+		"vul_start_timestamp",
+		"vul_end_timestamp",
+		"compliantType",
+		"vul_start_dependency_compliant",
+	}); err != nil {
+		return err
+	}
+
 	vulPackages := []VulPackage{{
 		PackageId:     "31296",
-		VulConstraint: "0.1.2 - 0.1.8",
+		VulConstraint: "0.1.2 - 0.3.2",
 	}}
 	for len(vulPackages) != 0 {
 		vulPackageId := vulPackages[0].PackageId
@@ -48,30 +66,15 @@ func handler() error {
 		}
 		log.Printf("脆弱性を持ったパッケージ(%s)に依存しているパッケージが %d 個見つかりました", vulPackageId, len(packages))
 
-		outputFile, err := os.Create("test.csv") // 書き込む先のファイル
-		if err != nil {
-			fmt.Println(err)
-		}
-		w := csv.NewWriter(outputFile)
-		if err := w.Write([]string{
-			"project_id",
-			"vul_project_id",
-			"vul_start_datetime",
-			"vul_end_datetime",
-			"vul_start_timestamp",
-			"vul_end_timestamp",
-			"compliantType",
-			"vul_start_dependency_compliant",
-		}); err != nil {
-			return err
-		}
-
 		for i, p := range packages {
 			log.Printf("未解析脆弱パッケージ残り: %d 個の %d/%d", len(vulPackages), i, len(packages))
 			results, err := analyzeVulnerabilityDuration(db, p.ProjectId, vulPackageId, vulConstraint)
 			if err != nil {
 				log.Printf("エラーが発生しました. error: %s", err)
 				continue
+			}
+			if len(results) != 0 {
+				log.Printf("%d個の脆弱性影響が見つかりました", len(results))
 			}
 			for _, r := range results {
 				var endDate *time.Time
@@ -94,7 +97,7 @@ func handler() error {
 				}); err != nil {
 					return err
 				}
-				//fmt.Printf("package %s: %s〜%s", p.ProjectId, r.VulStartDate.String(), endDate)
+				//fmt.Printf("package %s: %s〜%s\n", p.ProjectId, r.VulStartDate.String(), endDate)
 
 				vulPackages = append(vulPackages, VulPackage{
 					PackageId:     r.PackageId,
@@ -102,8 +105,8 @@ func handler() error {
 				})
 			}
 		}
-		w.Flush()
 	}
+	w.Flush()
 	return nil
 }
 
