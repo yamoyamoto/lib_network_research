@@ -4,10 +4,13 @@ import (
 	"analyzer/datasource"
 	"analyzer/models"
 	"database/sql"
+	"encoding/csv"
 	"fmt"
 	"github.com/Masterminds/semver"
 	_ "github.com/go-sql-driver/mysql"
 	"log"
+	"os"
+	"strconv"
 	"time"
 )
 
@@ -18,7 +21,7 @@ func main() {
 }
 
 const (
-	vulConstraint = "0.1.2 - 0.6.1"
+	vulConstraint = "0.1.2 - 0.3.0"
 	vulPackageId  = "31296"
 )
 
@@ -35,21 +38,66 @@ func handler() error {
 	}
 	log.Printf("脆弱性を持ったパッケージ(%s)に依存しているパッケージが %d 個見つかりました", vulPackageId, len(packages))
 
+	outputFile, err := os.Create("test.csv") // 書き込む先のファイル
+	if err != nil {
+		fmt.Println(err)
+	}
+	w := csv.NewWriter(outputFile)
+	if err := w.Write([]string{
+		"project_id",
+		"vul_project_id",
+		"vul_start_datetime",
+		"vul_end_datetime",
+		"vul_start_timestamp",
+		"vul_end_timestamp",
+	}); err != nil {
+		return err
+	}
+
 	for _, p := range packages {
 		log.Printf("↓package %s の解析結果↓", p.ProjectId)
-		if err := analyzeVulnerabilityDuration(db, p.ProjectId, "31296"); err != nil {
+		results, err := analyzeVulnerabilityDuration(db, p.ProjectId, "31296")
+		if err != nil {
 			return err
+		}
+		for _, r := range results {
+			var endDate *time.Time
+			if r.VulEndDate != nil {
+				endDate = r.VulEndDate
+			} else {
+				t := time.Now()
+				endDate = &t
+			}
+			if err := w.Write([]string{
+				p.ProjectId,
+				vulPackageId,
+				r.VulStartDate.String(),
+				endDate.String(),
+				strconv.FormatInt(r.VulStartDate.Unix(), 10),
+				strconv.FormatInt(endDate.Unix(), 10),
+			}); err != nil {
+				return err
+			}
+			fmt.Printf("package %s: %s〜%s", p.ProjectId, r.VulStartDate.String(), endDate)
 		}
 		print("\n\n")
 	}
+	w.Flush()
 
 	return nil
 }
 
-func analyzeVulnerabilityDuration(db *sql.DB, packageId string, vulPackageId string) error {
+type AnalyzeVulnerabilityDurationResult struct {
+	PackageId    string
+	VulPackageId string
+	VulStartDate *time.Time
+	VulEndDate   *time.Time
+}
+
+func analyzeVulnerabilityDuration(db *sql.DB, packageId string, vulPackageId string) ([]AnalyzeVulnerabilityDurationResult, error) {
 	releaseLogs, err := datasource.FetchMergedTwoPackageReleasesWithSort(db, packageId, vulPackageId)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// 脆弱性の影響を受けていた期間を特定
@@ -58,32 +106,40 @@ func analyzeVulnerabilityDuration(db *sql.DB, packageId string, vulPackageId str
 	nowAffectedVulnerability := false
 	var affectedVulnerabilityStartDate *time.Time
 
+	results := make([]AnalyzeVulnerabilityDurationResult, 0)
 	for i, releaseLog := range releaseLogs {
 		if releaseLog.PackageType == "package" {
 			// 依存元のパッケージ
 			isAffectedVulnerability, err := isAffectedVulnerabilityWithPackage(*releaseLog.DependencyRequirements, releaseLogs[0:i])
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if isAffectedVulnerability {
 				if !nowAffectedVulnerability {
 					d, err := time.Parse("2006-01-02 15:04:05", releaseLog.PublishedTimestamp)
 					if err != nil {
-						return err
+						return nil, err
 					}
 					affectedVulnerabilityStartDate = &d
 					nowAffectedVulnerability = true
 
-					fmt.Printf("脆弱性の影響を受けはじめた. 受けはじめの時刻: %s\n", affectedVulnerabilityStartDate.String())
+					//fmt.Printf("脆弱性の影響を受けはじめた. 受けはじめの時刻: %s\n", affectedVulnerabilityStartDate.String())
 				}
 				// 継続して脆弱性の影響を受けている
 			} else {
 				if nowAffectedVulnerability {
 					affectedVulnerabilityEndDate, err := time.Parse("2006-01-02 15:04:05", releaseLogs[i].PublishedTimestamp)
 					if err != nil {
-						return err
+						return nil, err
 					}
-					fmt.Printf("脆弱性の影響を受け終わった. 受け終わりの時刻: %s\n", affectedVulnerabilityEndDate.String())
+					//fmt.Printf("脆弱性の影響を受け終わった. 受け終わりの時刻: %s\n", affectedVulnerabilityEndDate.String())
+
+					results = append(results, AnalyzeVulnerabilityDurationResult{
+						PackageId:    packageId,
+						VulPackageId: vulPackageId,
+						VulStartDate: affectedVulnerabilityStartDate,
+						VulEndDate:   &affectedVulnerabilityEndDate,
+					})
 
 					// 状態を初期化
 					nowAffectedVulnerability = false
@@ -96,27 +152,33 @@ func analyzeVulnerabilityDuration(db *sql.DB, packageId string, vulPackageId str
 			// beforeReleaseには自分のリリースも入れる必要がある
 			isAffectedVulnerability, err := isAffectedVulnerabilityWithVulPackage(isAlreadyPublishedPackage, releaseLogs[0:i+1])
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if isAffectedVulnerability {
 				if !nowAffectedVulnerability {
 					d, err := time.Parse("2006-01-02 15:04:05", releaseLog.PublishedTimestamp)
 					if err != nil {
-						return err
+						return nil, err
 					}
 					affectedVulnerabilityStartDate = &d
 					nowAffectedVulnerability = true
 
-					fmt.Printf("脆弱性の影響を受けはじめた. 受けはじめの時刻: %s\n", affectedVulnerabilityStartDate.String())
+					//fmt.Printf("脆弱性の影響を受けはじめた. 受けはじめの時刻: %s\n", affectedVulnerabilityStartDate.String())
 				}
 				// 継続して脆弱性の影響を受けている
 			} else {
 				if nowAffectedVulnerability {
 					affectedVulnerabilityEndDate, err := time.Parse("2006-01-02 15:04:05", releaseLogs[i].PublishedTimestamp)
 					if err != nil {
-						return err
+						return nil, err
 					}
-					fmt.Printf("脆弱性の影響を受け終わった!! 受け終わりの時刻: %s\n", affectedVulnerabilityEndDate.String())
+					//fmt.Printf("脆弱性の影響を受け終わった!! 受け終わりの時刻: %s\n", affectedVulnerabilityEndDate.String())
+					results = append(results, AnalyzeVulnerabilityDurationResult{
+						PackageId:    packageId,
+						VulPackageId: vulPackageId,
+						VulStartDate: affectedVulnerabilityStartDate,
+						VulEndDate:   &affectedVulnerabilityEndDate,
+					})
 
 					// 状態を初期化
 					nowAffectedVulnerability = false
@@ -124,14 +186,20 @@ func analyzeVulnerabilityDuration(db *sql.DB, packageId string, vulPackageId str
 				}
 			}
 		} else {
-			return fmt.Errorf("got unknown type of package. type: %s", releaseLog.PackageType)
+			return nil, fmt.Errorf("got unknown type of package. type: %s", releaseLog.PackageType)
 		}
-
-		// ログ
-		//fmt.Printf("今、脆弱性の影響を受けている?: %v\n", nowAffectedVulnerability)
 	}
 
-	return nil
+	if nowAffectedVulnerability {
+		results = append(results, AnalyzeVulnerabilityDurationResult{
+			PackageId:    packageId,
+			VulPackageId: vulPackageId,
+			VulStartDate: affectedVulnerabilityStartDate,
+			VulEndDate:   nil,
+		})
+	}
+
+	return results, nil
 }
 
 func findLatestPackageDependencyRequirements(beforeReleases []models.ReleaseLog) (string, error) {
