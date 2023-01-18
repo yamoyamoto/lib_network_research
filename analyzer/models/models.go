@@ -9,3 +9,12 @@ type ReleaseLog struct {
 	PublishedTimestamp     string  `json:"published_timestamp"`
 	PackageType            string  `json:"type"`
 }
+
+type CompliantType int64
+
+const (
+	UnKnown CompliantType = iota
+	Compliant
+	Permissive
+	Restrictive
+)
