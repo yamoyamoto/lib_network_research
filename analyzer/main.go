@@ -24,6 +24,7 @@ func main() {
 type VulPackage struct {
 	PackageId     string
 	VulConstraint string
+	Deps          int64
 }
 
 func handler() error {
@@ -40,12 +41,12 @@ func handler() error {
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-
+			panic(err)
 		}
 	}(file)
 
 	r := csv.NewReader(file)
-	rows, err := r.ReadAll() // csvを一度に全て読み込む
+	rows, err := r.ReadAll()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -61,10 +62,11 @@ func handler() error {
 		vulPackages = append(vulPackages, VulPackage{
 			PackageId:     projectId,
 			VulConstraint: row[2],
+			Deps:          0,
 		})
 	}
 
-	outputFile, err := os.Create("test.csv") // 書き込む先のファイル
+	outputFile, err := os.Create("test.csv")
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -78,14 +80,22 @@ func handler() error {
 		"vul_end_timestamp",
 		"compliantType",
 		"vul_start_dependency_compliant",
+		"vul_start_version",
+		"vul_deps",
 	}); err != nil {
 		return err
 	}
 
 	for len(vulPackages) != 0 {
 		vulPackageId := vulPackages[0].PackageId
+		vulPackageDeps := vulPackages[0].Deps
 		vulConstraint := vulPackages[0].VulConstraint
 		vulPackages = vulPackages[1:]
+
+		// 深さ制限
+		if vulPackageDeps > 0 {
+			continue
+		}
 
 		// vulPackageに依存しているパッケージを全て取得
 		packages, err := datasource.FetchAffectedPackagesFromVulPackage(db, vulPackageId)
@@ -122,15 +132,17 @@ func handler() error {
 					strconv.FormatInt(int64(r.CompliantType), 10),
 					r.VulStartDependencyRequirement,
 					r.VulStartVersion.String(),
+					strconv.FormatInt(vulPackageDeps, 10),
 				}); err != nil {
 					return err
 				}
 				//fmt.Printf("package %s: %s〜%s\n", p.ProjectId, r.VulStartDate.String(), endDate)
 
-				vulPackages = append(vulPackages, VulPackage{
-					PackageId:     r.PackageId,
-					VulConstraint: fmt.Sprintf("%s - %s", r.VulStartVersion, r.VulEndVersion),
-				})
+				//vulPackages = append(vulPackages, VulPackage{
+				//	PackageId:     r.PackageId,
+				//	VulConstraint: fmt.Sprintf("%s - %s", r.VulStartVersion, r.VulEndVersion),
+				//	Deps:          vulPackageDeps + 1,
+				//})
 			}
 		}
 	}
@@ -295,11 +307,17 @@ func analyzeVulnerabilityDuration(db *sql.DB, packageId string, vulPackageId str
 			return nil, err
 		}
 
+		compliantType, err := sv.CheckCompliantSemVer(vulStartConstraint, vulStartVersion)
+		if err != nil {
+			return nil, err
+		}
+
 		results = append(results, AnalyzeVulnerabilityDurationResult{
 			PackageId:                     packageId,
 			VulPackageId:                  vulPackageId,
 			VulStartDate:                  affectedVulnerabilityStartDate,
 			VulEndDate:                    nil,
+			CompliantType:                 compliantType,
 			VulStartDependencyRequirement: vulStartConstraint,
 			VulStartVersion:               vulStartVersion,
 			VulEndVersion:                 vulEndVersion,
