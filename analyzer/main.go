@@ -32,6 +32,38 @@ func handler() error {
 		return err
 	}
 
+	// 脆弱性のリスト
+	file, err := os.Open("../vulnerability/data.csv") // 先ほど入手した郵便番号データをos.Openで開く
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+
+		}
+	}(file)
+
+	r := csv.NewReader(file)
+	rows, err := r.ReadAll() // csvを一度に全て読み込む
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	vulPackages := make([]VulPackage, 0)
+	for _, row := range rows {
+		log.Printf("パッケージ名: %s", row[1])
+		projectId, err := datasource.GetPackageIdByName(db, row[1])
+		if err != nil {
+			log.Printf("エラーが発生しました. error: %s", err)
+			continue
+		}
+		vulPackages = append(vulPackages, VulPackage{
+			PackageId:     projectId,
+			VulConstraint: row[2],
+		})
+	}
+
 	outputFile, err := os.Create("test.csv") // 書き込む先のファイル
 	if err != nil {
 		fmt.Println(err)
@@ -50,10 +82,6 @@ func handler() error {
 		return err
 	}
 
-	vulPackages := []VulPackage{{
-		PackageId:     "31296",
-		VulConstraint: "0.1.2 - 0.3.2",
-	}}
 	for len(vulPackages) != 0 {
 		vulPackageId := vulPackages[0].PackageId
 		vulConstraint := vulPackages[0].VulConstraint
