@@ -3,7 +3,7 @@ package sv
 import (
 	"analyzer/models"
 	"fmt"
-	"github.com/Masterminds/semver"
+	semver "github.com/Masterminds/semver/v3"
 )
 
 func CheckCompliantSemVer(constraint string, okVersion *semver.Version) (models.CompliantType, error) {
@@ -40,7 +40,7 @@ func CheckCompliantSemVer(constraint string, okVersion *semver.Version) (models.
 		}
 
 		// マイナーが上がってだめなら、semver非準拠(より厳しい制約)
-		vUpMinor, err := semver.NewVersion(fmt.Sprintf("%d.%d.%d", okVersion.Major(), okVersion.Minor(), okVersion.Patch()+1))
+		vUpMinor, err := semver.NewVersion(fmt.Sprintf("%d.%d.%d", okVersion.Major(), okVersion.Minor()+1, okVersion.Patch()))
 		if err != nil {
 			return models.UnKnown, err
 		}
@@ -49,7 +49,7 @@ func CheckCompliantSemVer(constraint string, okVersion *semver.Version) (models.
 		}
 
 		// メジャーが上がってOKなら、semver非準拠(よりゆるい制約)
-		vUpMajor, err := semver.NewVersion(fmt.Sprintf("%d.%d.%d", okVersion.Major(), okVersion.Minor(), okVersion.Patch()+1))
+		vUpMajor, err := semver.NewVersion(fmt.Sprintf("%d.%d.%d", okVersion.Major()+1, okVersion.Minor(), okVersion.Patch()))
 		if err != nil {
 			return models.UnKnown, err
 		}

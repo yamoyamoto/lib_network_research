@@ -7,7 +7,7 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"fmt"
-	"github.com/Masterminds/semver"
+	semver "github.com/Masterminds/semver/v3"
 	_ "github.com/go-sql-driver/mysql"
 	"log"
 	"os"
@@ -28,7 +28,7 @@ type VulPackage struct {
 }
 
 const (
-	ecosystemType = "cargo"
+	ecosystemType = "npm"
 )
 
 func handler() error {
@@ -38,7 +38,7 @@ func handler() error {
 	}
 
 	// 脆弱性のリスト
-	file, err := os.Open("../vulnerability/data.csv") // 先ほど入手した郵便番号データをos.Openで開く
+	file, err := os.Open("../vulnerability/npmdata.csv")
 	if err != nil {
 		log.Fatal(err)
 	}
