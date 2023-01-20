@@ -38,7 +38,7 @@ func handler() error {
 	}
 
 	// 脆弱性のリスト
-	file, err := os.Open("../vulnerability/npmdata.csv")
+	file, err := os.Open("../vulnerability/npm_vul_data.csv")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -142,6 +142,7 @@ func handler() error {
 				}
 				//fmt.Printf("package %s: %s〜%s\n", p.ProjectId, r.VulStartDate.String(), endDate)
 
+				// 推移的な依存関係は後考える
 				//vulPackages = append(vulPackages, VulPackage{
 				//	PackageId:     r.PackageId,
 				//	VulConstraint: fmt.Sprintf("%s - %s", r.VulStartVersion, r.VulEndVersion),
