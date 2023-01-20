@@ -27,6 +27,10 @@ type VulPackage struct {
 	Deps          int64
 }
 
+const (
+	ecosystemType = "cargo"
+)
+
 func handler() error {
 	db, err := sql.Open("mysql", "root@(localhost:3306)/lib")
 	if err != nil {
@@ -54,7 +58,7 @@ func handler() error {
 	vulPackages := make([]VulPackage, 0)
 	for _, row := range rows {
 		log.Printf("パッケージ名: %s", row[1])
-		projectId, err := datasource.GetPackageIdByName(db, row[1])
+		projectId, err := datasource.GetPackageIdByName(db, ecosystemType, row[1])
 		if err != nil {
 			log.Printf("エラーが発生しました. error: %s", err)
 			continue
@@ -98,7 +102,7 @@ func handler() error {
 		}
 
 		// vulPackageに依存しているパッケージを全て取得
-		packages, err := datasource.FetchAffectedPackagesFromVulPackage(db, vulPackageId)
+		packages, err := datasource.FetchAffectedPackagesFromVulPackage(db, ecosystemType, vulPackageId)
 		if err != nil {
 			return err
 		}
@@ -162,7 +166,7 @@ type AnalyzeVulnerabilityDurationResult struct {
 }
 
 func analyzeVulnerabilityDuration(db *sql.DB, packageId string, vulPackageId string, vulConstraint string) ([]AnalyzeVulnerabilityDurationResult, error) {
-	releaseLogs, err := datasource.FetchMergedTwoPackageReleasesWithSort(db, packageId, vulPackageId)
+	releaseLogs, err := datasource.FetchMergedTwoPackageReleasesWithSort(db, ecosystemType, packageId, vulPackageId)
 	if err != nil {
 		return nil, err
 	}

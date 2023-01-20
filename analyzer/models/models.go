@@ -18,3 +18,10 @@ const (
 	Permissive
 	Restrictive
 )
+
+type EcosystemType string
+
+const (
+	Cargo EcosystemType = "cargo"
+	Npm   EcosystemType = "npm"
+)

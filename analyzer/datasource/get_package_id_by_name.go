@@ -1,21 +1,23 @@
 package datasource
 
 import (
+	"analyzer/models"
 	"database/sql"
 )
 
 const (
 	getPackageIdByName = `
 SELECT d.project_id
-FROM dependencies_cargo d
+FROM dependencies_{{.ecosystemType}} d
 WHERE d.project_name='{{.projectName}}'
 LIMIT 1
 `
 )
 
-func GetPackageIdByName(db *sql.DB, projectName string) (string, error) {
+func GetPackageIdByName(db *sql.DB, ecosystem models.EcosystemType, projectName string) (string, error) {
 	sqlString, err := buildStringWithParamsFromTemplate(getPackageIdByName, map[string]string{
-		"projectName": projectName,
+		"projectName":   projectName,
+		"ecosystemType": string(ecosystem),
 	})
 	if err != nil {
 		return "", err

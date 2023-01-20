@@ -1,6 +1,7 @@
 package datasource
 
 import (
+	"analyzer/models"
 	"database/sql"
 )
 
@@ -10,13 +11,14 @@ type AffectedPackagesFromVulPackage struct {
 
 const fetchAffectedPackagesFromVulPackageSqlTemplate = `
 SELECT DISTINCT d.project_id
-FROM dependencies_cargo d
+FROM dependencies_{{.ecosystemType}} d
 WHERE d.dependency_project_id={{.vulPackageId}}
 `
 
-func FetchAffectedPackagesFromVulPackage(db *sql.DB, vulPackageId string) ([]AffectedPackagesFromVulPackage, error) {
+func FetchAffectedPackagesFromVulPackage(db *sql.DB, ecosystem models.EcosystemType, vulPackageId string) ([]AffectedPackagesFromVulPackage, error) {
 	sqlString, err := buildStringWithParamsFromTemplate(fetchAffectedPackagesFromVulPackageSqlTemplate, map[string]string{
-		"vulPackageId": vulPackageId,
+		"vulPackageId":  vulPackageId,
+		"ecosystemType": string(ecosystem),
 	})
 	if err != nil {
 		return nil, err
