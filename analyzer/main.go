@@ -76,7 +76,7 @@ func handler() error {
 		i_2++
 	}
 
-	outputFile, err := os.Create("test.csv")
+	outputFile, err := os.Create("affected_packages_npm.csv")
 	if err != nil {
 		fmt.Println(err)
 	}
