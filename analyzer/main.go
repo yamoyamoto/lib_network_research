@@ -39,7 +39,7 @@ func handler() error {
 	}
 
 	// 脆弱性のリスト
-	file, err := os.Open("../vulnerability/npm_vul_data_before_2020.csv")
+	file, err := os.Open("../vulnerability/npm_vul_data_before_2019.csv")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -57,19 +57,23 @@ func handler() error {
 	}
 
 	vulPackages := make([]VulPackage, 0)
-	for _, row := range rows {
-		log.Printf("パッケージ名: %s", row[1])
-		projectId, err := datasource.GetPackageIdByName(db, ecosystemType, row[1])
+	i_2 := 0
+	for i := len(rows) - 1; i >= 0; i-- {
+		if i_2 > 100 {
+			break
+		}
+		projectId, err := datasource.GetPackageIdByName(db, ecosystemType, rows[i][1])
 		if err != nil {
 			log.Printf("エラーが発生しました. error: %s", err)
 			continue
 		}
 		vulPackages = append(vulPackages, VulPackage{
 			PackageId:     projectId,
-			PackageName:   row[1],
-			VulConstraint: row[2],
+			PackageName:   rows[i][1],
+			VulConstraint: rows[i][2],
 			Deps:          0,
 		})
+		i_2++
 	}
 
 	outputFile, err := os.Create("test.csv")
@@ -92,6 +96,7 @@ func handler() error {
 		return err
 	}
 
+	affectedVulCount := 0
 	for len(vulPackages) != 0 {
 		vulPakageName := vulPackages[0].PackageName
 		vulPackageId := vulPackages[0].PackageId
@@ -112,18 +117,14 @@ func handler() error {
 		log.Printf("脆弱性を持ったパッケージ(%s)に依存しているパッケージが %d 個見つかりました", vulPackageId, len(packages))
 
 		for i, p := range packages {
-			if i%1000 == 0 {
-				log.Printf("未解析脆弱パッケージ残り: %d 個の %d/%d   now: %s (%s)", len(vulPackages), i, len(packages), vulPakageName, vulConstraint)
-			}
+			log.Printf("未解析脆弱パッケージ残り: %d 個の %d/%d   now: %s (%s), 見つかった脆弱性の数: %d", len(vulPackages), i, len(packages), vulPakageName, vulConstraint, affectedVulCount)
 			results, err := analyzeVulnerabilityDuration(db, p.ProjectId, vulPackageId, vulConstraint)
 			if err != nil {
 				log.Printf("エラーが発生しました. error: %s", err)
 				continue
 			}
-			//if len(results) != 0 {
-			//	log.Printf("%d個の脆弱性影響が見つかりました", len(results))
-			//}
 			for _, r := range results {
+				affectedVulCount++
 				var endDate *time.Time
 				if r.VulEndDate != nil {
 					endDate = r.VulEndDate
