@@ -23,6 +23,7 @@ func main() {
 
 type VulPackage struct {
 	PackageId     string
+	PackageName   string
 	VulConstraint string
 	Deps          int64
 }
@@ -38,7 +39,7 @@ func handler() error {
 	}
 
 	// 脆弱性のリスト
-	file, err := os.Open("../vulnerability/npm_vul_data.csv")
+	file, err := os.Open("../vulnerability/npm_vul_data_before_2020.csv")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -65,6 +66,7 @@ func handler() error {
 		}
 		vulPackages = append(vulPackages, VulPackage{
 			PackageId:     projectId,
+			PackageName:   row[1],
 			VulConstraint: row[2],
 			Deps:          0,
 		})
@@ -91,6 +93,7 @@ func handler() error {
 	}
 
 	for len(vulPackages) != 0 {
+		vulPakageName := vulPackages[0].PackageName
 		vulPackageId := vulPackages[0].PackageId
 		vulPackageDeps := vulPackages[0].Deps
 		vulConstraint := vulPackages[0].VulConstraint
@@ -109,15 +112,17 @@ func handler() error {
 		log.Printf("脆弱性を持ったパッケージ(%s)に依存しているパッケージが %d 個見つかりました", vulPackageId, len(packages))
 
 		for i, p := range packages {
-			log.Printf("未解析脆弱パッケージ残り: %d 個の %d/%d", len(vulPackages), i, len(packages))
+			if i%1000 == 0 {
+				log.Printf("未解析脆弱パッケージ残り: %d 個の %d/%d   now: %s (%s)", len(vulPackages), i, len(packages), vulPakageName, vulConstraint)
+			}
 			results, err := analyzeVulnerabilityDuration(db, p.ProjectId, vulPackageId, vulConstraint)
 			if err != nil {
 				log.Printf("エラーが発生しました. error: %s", err)
 				continue
 			}
-			if len(results) != 0 {
-				log.Printf("%d個の脆弱性影響が見つかりました", len(results))
-			}
+			//if len(results) != 0 {
+			//	log.Printf("%d個の脆弱性影響が見つかりました", len(results))
+			//}
 			for _, r := range results {
 				var endDate *time.Time
 				if r.VulEndDate != nil {
