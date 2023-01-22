@@ -17,6 +17,9 @@ const (
 	Compliant
 	Permissive
 	Restrictive
+	ZeroVersionCompliant
+	ZeroVersionPermissive
+	ZeroVersionRestrictive
 )
 
 type EcosystemType string
