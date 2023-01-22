@@ -33,13 +33,17 @@ const (
 )
 
 func handler() error {
+	args := os.Args
+	vulPackgeInputFile := args[1]
+	outputFile := args[2]
+
 	db, err := sql.Open("mysql", "root@(localhost:3306)/lib")
 	if err != nil {
 		return err
 	}
 
 	// 脆弱性のリスト
-	file, err := os.Open("../vulnerability/npm_vul_data_before_2019_last_100.csv")
+	file, err := os.Open(vulPackgeInputFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -83,7 +87,7 @@ func handler() error {
 		"affectedVulCount",
 	})
 
-	affectedPackagesOutputFile, err := os.Create("affected_packages_npm_with_all.csv")
+	affectedPackagesOutputFile, err := os.Create(outputFile)
 	if err != nil {
 		return err
 	}
