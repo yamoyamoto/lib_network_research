@@ -39,7 +39,7 @@ func handler() error {
 	}
 
 	// 脆弱性のリスト
-	file, err := os.Open("../vulnerability/npm_vul_data_before_2019.csv")
+	file, err := os.Open("../vulnerability/npm_vul_data_before_2019_last_100.csv")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -57,11 +57,7 @@ func handler() error {
 	}
 
 	vulPackages := make([]VulPackage, 0)
-	i_2 := 0
 	for i := len(rows) - 1; i >= 0; i-- {
-		if i_2 > 100 {
-			break
-		}
 		projectId, err := datasource.GetPackageIdByName(db, ecosystemType, rows[i][1])
 		if err != nil {
 			log.Printf("エラーが発生しました. error: %s", err)
@@ -73,7 +69,6 @@ func handler() error {
 			VulConstraint: rows[i][2],
 			Deps:          0,
 		})
-		i_2++
 	}
 
 	vulPackagesOutputFile, err := os.Create("vul_packages_npm.csv")
