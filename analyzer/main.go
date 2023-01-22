@@ -76,11 +76,23 @@ func handler() error {
 		i_2++
 	}
 
-	outputFile, err := os.Create("affected_packages_npm.csv")
+	vulPackagesOutputFile, err := os.Create("vul_packages_npm.csv")
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
-	w := csv.NewWriter(outputFile)
+	vulPackagesOutputFileWriter := csv.NewWriter(vulPackagesOutputFile)
+	vulPackagesOutputFileWriter.Write([]string{
+		"vulPackageId",
+		"vulPakageName",
+		"vulConstraint",
+		"affectedVulCount",
+	})
+
+	affectedPackagesOutputFile, err := os.Create("affected_packages_npm_with_all.csv")
+	if err != nil {
+		return err
+	}
+	w := csv.NewWriter(affectedPackagesOutputFile)
 	if err := w.Write([]string{
 		"project_id",
 		"vul_project_id",
@@ -92,12 +104,15 @@ func handler() error {
 		"vul_start_dependency_compliant",
 		"vul_start_version",
 		"vul_deps",
+		// 脆弱性パッケージが(このパッケージも含めて)影響を与えたパッケージの総数
+		"vul_total_count",
 	}); err != nil {
 		return err
 	}
 
-	affectedVulCount := 0
 	for len(vulPackages) != 0 {
+		affectedVulCount := 0
+
 		vulPakageName := vulPackages[0].PackageName
 		vulPackageId := vulPackages[0].PackageId
 		vulPackageDeps := vulPackages[0].Deps
@@ -143,6 +158,7 @@ func handler() error {
 					r.VulStartDependencyRequirement,
 					r.VulStartVersion.String(),
 					strconv.FormatInt(vulPackageDeps, 10),
+					strconv.FormatInt(int64(len(results)), 10),
 				}); err != nil {
 					return err
 				}
@@ -156,7 +172,16 @@ func handler() error {
 				//})
 			}
 		}
+		vulPackagesOutputFileWriter.Write([]string{
+			vulPackageId,
+			vulPakageName,
+			vulConstraint,
+			strconv.FormatInt(int64(affectedVulCount), 10),
+		})
+		w.Flush()
+		vulPackagesOutputFileWriter.Flush()
 	}
+	vulPackagesOutputFileWriter.Flush()
 	w.Flush()
 	return nil
 }
