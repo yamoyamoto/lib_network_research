@@ -24,9 +24,9 @@ func CheckCompliantSemVer(constraint string, okVersion *semver.Version) (models.
 			return models.UnKnown, err
 		}
 		if c.Check(v) {
-			return models.Permissive, nil
+			return models.ZeroVersionPermissive, nil
 		} else {
-			return models.Compliant, nil
+			return models.ZeroVersionCompliant, nil
 		}
 	} else {
 		// 本番開発リリース=パッチ&マイナーアップデートは受け入れる
