@@ -28,14 +28,11 @@ type VulPackage struct {
 	Deps          int64
 }
 
-const (
-	ecosystemType = "npm"
-)
-
 func handler() error {
 	args := os.Args
 	vulPackgeInputFile := args[1]
 	outputFile := args[2]
+	ecosystemType := models.EcosystemType(args[3])
 
 	db, err := sql.Open("mysql", "root@(localhost:3306)/lib")
 	if err != nil {
@@ -132,7 +129,7 @@ func handler() error {
 
 		for i, p := range packages {
 			log.Printf("未解析脆弱パッケージ残り: %d 個の %d/%d   now: %s (%s), 見つかった脆弱性の数: %d", len(vulPackages), i, len(packages), vulPakageName, vulConstraint, affectedVulCount)
-			results, err := analyzeVulnerabilityDuration(db, p.ProjectId, vulPackageId, vulConstraint)
+			results, err := analyzeVulnerabilityDuration(db, p.ProjectId, vulPackageId, vulConstraint, ecosystemType)
 			if err != nil {
 				log.Printf("エラーが発生しました. error: %s", err)
 				continue
@@ -196,7 +193,7 @@ type AnalyzeVulnerabilityDurationResult struct {
 	VulEndVersion                 *semver.Version
 }
 
-func analyzeVulnerabilityDuration(db *sql.DB, packageId string, vulPackageId string, vulConstraint string) ([]AnalyzeVulnerabilityDurationResult, error) {
+func analyzeVulnerabilityDuration(db *sql.DB, packageId string, vulPackageId string, vulConstraint string, ecosystemType models.EcosystemType) ([]AnalyzeVulnerabilityDurationResult, error) {
 	releaseLogs, err := datasource.FetchMergedTwoPackageReleasesWithSort(db, ecosystemType, packageId, vulPackageId)
 	if err != nil {
 		return nil, err
