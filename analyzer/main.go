@@ -102,6 +102,7 @@ func handler() error {
 		"vul_deps",
 		// 脆弱性パッケージが(このパッケージも含めて)影響を与えたパッケージの総数
 		"vul_total_count",
+		"source_rank",
 	}); err != nil {
 		return err
 	}
@@ -134,6 +135,11 @@ func handler() error {
 				log.Printf("エラーが発生しました. error: %s", err)
 				continue
 			}
+			affectedPackage, err := datasource.GetPackageById(db, p.ProjectId)
+			if err != nil {
+				log.Printf("エラーが発生しました. error: %s", err)
+				continue
+			}
 			for _, r := range results {
 				affectedVulCount++
 				var endDate *time.Time
@@ -155,6 +161,7 @@ func handler() error {
 					r.VulStartVersion.String(),
 					strconv.FormatInt(vulPackageDeps, 10),
 					strconv.FormatInt(int64(len(results)), 10),
+					strconv.FormatInt(affectedPackage.SourceRank, 10),
 				}); err != nil {
 					return err
 				}
