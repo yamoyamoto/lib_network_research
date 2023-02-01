@@ -17,7 +17,7 @@ import (
 
 func main() {
 	if err := handler(); err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 }
 
@@ -42,7 +42,7 @@ func handler() error {
 	// 脆弱性のリスト
 	file, err := os.Open(vulPackgeInputFile)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer func(file *os.File) {
 		err := file.Close()
@@ -54,7 +54,7 @@ func handler() error {
 	r := csv.NewReader(file)
 	rows, err := r.ReadAll()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	vulPackages := make([]VulPackage, 0)
