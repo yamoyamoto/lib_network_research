@@ -28,3 +28,7 @@ const (
 	Cargo EcosystemType = "cargo"
 	Npm   EcosystemType = "npm"
 )
+
+type Package struct {
+	SourceRank int64
+}
