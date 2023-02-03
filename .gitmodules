@@ -1,3 +1,6 @@
 [submodule "vulnerability/advisory-database"]
 	path = vulnerability/advisory-database
 	url = https://github.com/github/advisory-database.git
+[submodule "phpsemver"]
+	path = phpsemver
+	url = https://github.com/yamoyamoto/phpsemver.git
