@@ -3,7 +3,7 @@ package sv
 import (
 	"analyzer/models"
 	"fmt"
-	semver "github.com/Masterminds/semver/v3"
+	"yamoyamoto/phpsemver"
 )
 
 func CheckCompliantSemVer(constraint string, okVersion *semver.Version) (models.CompliantType, error) {

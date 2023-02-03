@@ -7,12 +7,12 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"fmt"
-	semver "github.com/Masterminds/semver/v3"
 	_ "github.com/go-sql-driver/mysql"
 	"log"
 	"os"
 	"strconv"
 	"time"
+	"yamoyamoto/phpsemver"
 )
 
 func main() {
