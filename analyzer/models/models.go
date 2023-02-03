@@ -25,8 +25,10 @@ const (
 type EcosystemType string
 
 const (
-	Cargo EcosystemType = "cargo"
-	Npm   EcosystemType = "npm"
+	Cargo     EcosystemType = "cargo"
+	Npm       EcosystemType = "npm"
+	Packagist EcosystemType = "packagist"
+	RubyGems  EcosystemType = "rubygems"
 )
 
 type Package struct {
