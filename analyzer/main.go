@@ -129,10 +129,10 @@ func handler() error {
 		log.Printf("脆弱性を持ったパッケージ(%s)に依存しているパッケージが %d 個見つかりました", vulPackageId, len(packages))
 
 		for i, p := range packages {
-			log.Printf("未解析脆弱パッケージ残り: %d 個の %d/%d   now: %s (%s), 見つかった脆弱性の数: %d", len(vulPackages), i, len(packages), vulPakageName, vulConstraint, affectedVulCount)
+			log.Printf("未解析脆弱パッケージ残り: %d 個の %d/%d   now: %s (%s), projectId:%s, 見つかった脆弱性の数: %d", len(vulPackages), i, len(packages), vulPakageName, vulConstraint, p.ProjectId, affectedVulCount)
 			results, err := analyzeVulnerabilityDuration(db, p.ProjectId, vulPackageId, vulConstraint, ecosystemType)
 			if err != nil {
-				log.Printf("エラーが発生しました. error: %s", err)
+				log.Printf("エラーが発生しました. error: %s, vulConstraint: %s", err, vulConstraint)
 				continue
 			}
 			affectedPackage, err := datasource.GetPackageById(db, p.ProjectId)
