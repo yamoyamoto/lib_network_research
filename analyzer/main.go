@@ -122,20 +122,28 @@ func handler() error {
 		}
 
 		// vulPackageに依存しているパッケージを全て取得
-		packages, err := datasource.FetchAffectedPackagesFromVulPackage(db, ecosystemType, vulPackageId)
+		packages, err := datasource.FetchAffectedPackagesWithVersions(db, ecosystemType, vulPackageId)
 		if err != nil {
 			return err
 		}
 		log.Printf("脆弱性を持ったパッケージ(%s)に依存しているパッケージが %d 個見つかりました", vulPackageId, len(packages))
 
-		for i, p := range packages {
-			log.Printf("未解析脆弱パッケージ残り: %d 個の %d/%d   now: %s (%s), projectId:%s, 見つかった脆弱性の数: %d", len(vulPackages), i, len(packages), vulPakageName, vulConstraint, p.ProjectId, affectedVulCount)
-			results, err := analyzeVulnerabilityDuration(db, p.ProjectId, vulPackageId, vulConstraint, ecosystemType)
+		// 脆弱性パッケージのリリース履歴を取得する
+		vulPackageReleaseLogs, err := datasource.GetVulPackageVersionsById(db, vulPackageId, ecosystemType)
+		if err != nil {
+			return err
+		}
+
+		i := 0
+		for affectedPackageId, releaseLogs := range packages {
+			i++
+			log.Printf("未解析脆弱パッケージ残り: %d 個の %d/%d   now: %s (%s), projectId:%s, releaseLogの数: %d 見つかった脆弱性の数: %d", len(vulPackages), i, len(packages), vulPakageName, vulConstraint, affectedPackageId, len(releaseLogs)+len(vulPackageReleaseLogs), affectedVulCount)
+			results, err := analyzeVulnerabilityDuration(db, affectedPackageId, vulPackageId, vulConstraint, ecosystemType, mergeTwoReleaseLogs(releaseLogs, vulPackageReleaseLogs))
 			if err != nil {
 				log.Printf("エラーが発生しました. error: %s, vulConstraint: %s", err, vulConstraint)
 				continue
 			}
-			affectedPackage, err := datasource.GetPackageById(db, p.ProjectId)
+			affectedPackage, err := datasource.GetPackageById(db, affectedPackageId)
 			if err != nil {
 				log.Printf("エラーが発生しました. error: %s", err)
 				continue
@@ -150,7 +158,7 @@ func handler() error {
 					endDate = &t
 				}
 				if err := w.Write([]string{
-					p.ProjectId,
+					affectedPackageId,
 					vulPackageId,
 					r.VulStartDate.String(),
 					endDate.String(),
@@ -200,11 +208,28 @@ type AnalyzeVulnerabilityDurationResult struct {
 	VulEndVersion                 *semver.Version
 }
 
-func analyzeVulnerabilityDuration(db *sql.DB, packageId string, vulPackageId string, vulConstraint string, ecosystemType models.EcosystemType) ([]AnalyzeVulnerabilityDurationResult, error) {
-	releaseLogs, err := datasource.FetchMergedTwoPackageReleasesWithSort(db, ecosystemType, packageId, vulPackageId)
-	if err != nil {
-		return nil, err
+func mergeTwoReleaseLogs(a []models.ReleaseLog, b []models.ReleaseLog) []models.ReleaseLog {
+	i := 0
+	j := 0
+	newReleaseLogs := make([]models.ReleaseLog, len(a)+len(b))
+	for k := 0; k < len(a)+len(b); k++ {
+		if i < len(a) && j < len(b) && a[i].PublishedTimestamp < b[j].PublishedTimestamp {
+			newReleaseLogs[k] = a[i]
+			i++
+		} else if j < len(b) {
+			newReleaseLogs[k] = b[j]
+			j++
+		}
 	}
+
+	return newReleaseLogs
+}
+
+func analyzeVulnerabilityDuration(db *sql.DB, packageId string, vulPackageId string, vulConstraint string, ecosystemType models.EcosystemType, releaseLogs []models.ReleaseLog) ([]AnalyzeVulnerabilityDurationResult, error) {
+	//releaseLogs, err := datasource.FetchMergedTwoPackageReleasesWithSort(db, ecosystemType, packageId, vulPackageId)
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	// 脆弱性の影響を受けていた期間を特定
 	// 変数: 脆弱性の始まりと終わりのバージョン
