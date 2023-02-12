@@ -17,11 +17,20 @@ const (
 	Compliant
 	Permissive
 	Restrictive
+	ZeroVersionCompliant
+	ZeroVersionPermissive
+	ZeroVersionRestrictive
 )
 
 type EcosystemType string
 
 const (
-	Cargo EcosystemType = "cargo"
-	Npm   EcosystemType = "npm"
+	Cargo     EcosystemType = "cargo"
+	Npm       EcosystemType = "npm"
+	Packagist EcosystemType = "packagist"
+	RubyGems  EcosystemType = "rubygems"
 )
+
+type Package struct {
+	SourceRank int64
+}
