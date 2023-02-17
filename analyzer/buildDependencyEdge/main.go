@@ -11,6 +11,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"log"
 	"os"
+	"time"
 )
 
 type InputRecord struct {
@@ -76,6 +77,7 @@ func handler() error {
 		return err
 	}
 	bar := pb.Full.Start(len(records))
+	bar.SetRefreshRate(10 * time.Second)
 	for _, record := range records {
 		bar.Increment()
 
