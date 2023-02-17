@@ -2,15 +2,19 @@ module kafka
 
 go 1.18
 
-require github.com/segmentio/kafka-go v0.4.38
+require (
+	analyzer v0.0.0
+	github.com/aws/aws-sdk-go v1.41.3
+	github.com/segmentio/kafka-go v0.4.38
+	github.com/segmentio/kafka-go/sasl/aws_msk_iam v0.0.0-20230127181734-172fe7593625
+)
 
 require (
-	github.com/aws/aws-sdk-go v1.41.3 // indirect
+	github.com/Masterminds/semver/v3 v3.2.0 // indirect
+	github.com/go-sql-driver/mysql v1.7.0 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/pierrec/lz4/v4 v4.1.15 // indirect
-	github.com/segmentio/kafka-go/sasl/aws_msk_iam v0.0.0-20230127181734-172fe7593625 // indirect
-	github.com/xdg/scram v1.0.5 // indirect
-	github.com/xdg/stringprep v1.0.3 // indirect
-	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d // indirect
-	golang.org/x/text v0.3.7 // indirect
 )
+
+replace analyzer v0.0.0 => ./../analyzer
