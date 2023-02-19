@@ -66,9 +66,11 @@ func handler() error {
 	}
 	outputWriter := csv.NewWriter(outFile)
 	outputWriter.Write([]string{
-		"packageVersionId",
-		"dependencyPackageVersionId",
+		"id",
+		":START_ID",
+		":END_ID",
 		"dependencyRequirement",
+		":TYPE",
 	})
 
 	log.Println("record count:", len(records))
@@ -78,6 +80,8 @@ func handler() error {
 	}
 	bar := pb.Full.Start(len(records))
 	bar.SetRefreshRate(10 * time.Second)
+
+	count := 1
 	for _, record := range records {
 		bar.Increment()
 
@@ -107,12 +111,14 @@ func handler() error {
 					continue
 				}
 
-				//log.Printf("依存関係が見つかりました. %s:%s -> %s:%s", release.ProjectId, release.VersionNumber, usedDependencyPackageRelease.ProjectId, usedDependencyPackageRelease.VersionNumber)
 				outputWriter.Write([]string{
+					fmt.Sprint(count),
 					release.VersionId,
 					usedDependencyPackageRelease.VersionId,
 					*release.DependencyRequirements,
+					"dependency",
 				})
+				count++
 			} else if release.PackageType == "vul_package" {
 				// 依存先
 				latestDependencyProjectReleaseIndex = i
@@ -130,10 +136,13 @@ func handler() error {
 
 				if isSatisfy {
 					outputWriter.Write([]string{
+						fmt.Sprint(count),
 						releases[latestProjectReleaseIndex].VersionId,
 						release.VersionId,
 						*releases[latestProjectReleaseIndex].DependencyRequirements,
+						"dependency",
 					})
+					count++
 				}
 			} else {
 				log.Println("unknown package type.", release)
