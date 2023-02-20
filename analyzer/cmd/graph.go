@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	"log"
 )
 
 const (
@@ -25,11 +25,11 @@ func AnalyzeWithGraphDB() error {
 	greeting, err := session.ExecuteWrite(ctx, func(transaction neo4j.ManagedTransaction) (any, error) {
 		result, err := transaction.Run(ctx,
 			//"MATCH (p)-[r:dependency*1..4]->(v:verison{package_id:\"158021\"}) RETURN p,r,v",
-			"MATCH p = (from:verison)-[r:dependency]->(to:verison)-[n:next]->(fixed:verison)"+
+			"MATCH p = (from:verison)-[r:dependency*3..3]->(to:verison)-[n:next]->(fixed:verison)"+
 				"WHERE to.id=\"474521\" OR to.id=\"540773\" "+
 				//"WITH "+
-				" RETURN from, to, fixed"+
-				" LIMIT 25",
+				" RETURN from, to, fixed",
+			//" LIMIT 25",
 			map[string]any{})
 		if err != nil {
 			return nil, err
@@ -46,16 +46,17 @@ func AnalyzeWithGraphDB() error {
 		return err
 	}
 
-	for _, row := range greeting.([]interface{}) {
-		r := row.(*neo4j.Record)
-		log.Printf("source project id:%s(%s) -> affected project id:%s(%s) -> fixed version: %s \n\n",
-			r.Values[0].(neo4j.Node).Props["package_id"],
-			r.Values[0].(neo4j.Node).Props["number"],
-			r.Values[1].(neo4j.Node).Props["package_id"],
-			r.Values[1].(neo4j.Node).Props["number"],
-			r.Values[2].(neo4j.Node).Props["number"],
-		)
-	}
+	fmt.Printf("脆弱性影響の数: %d", len(greeting.([]any)))
+	//for _, row := range greeting.([]interface{}) {
+	//	r := row.(*neo4j.Record)
+	//	log.Printf("source project id:%s(%s) -> affected project id:%s(%s) -> fixed version: %s \n\n",
+	//		r.Values[0].(neo4j.Node).Props["package_id"],
+	//		r.Values[0].(neo4j.Node).Props["number"],
+	//		r.Values[1].(neo4j.Node).Props["package_id"],
+	//		r.Values[1].(neo4j.Node).Props["number"],
+	//		r.Values[2].(neo4j.Node).Props["number"],
+	//	)
+	//}
 
 	return nil
 }
