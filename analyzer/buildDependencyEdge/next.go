@@ -81,9 +81,9 @@ func parseNextEdges() error {
 
 	for _, e := range nextEdges {
 		outputWriter.Write([]string{
-			e.Id,
 			e.From,
 			e.To,
+			"",
 			"next",
 		})
 	}
