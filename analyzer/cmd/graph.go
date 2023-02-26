@@ -30,37 +30,12 @@ func AnalyzeWithGraphDB() error {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 
-	//greeting, err := session.ExecuteWrite(ctx, func(transaction neo4j.ManagedTransaction) (any, error) {
-	//	result, err := transaction.Run(ctx,
-	//		fmt.Sprintf(`MATCH p = (from:verison)-[r:dependency*%d..%d]->(to:verison)-[n:next]->(fixed:verison)
-	//							WHERE to.id="474521" OR to.id="540773"
-	//							RETURN from, to, fixed
-	//		`, deps, deps),
-	//		map[string]any{})
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//
-	//	res := make([]any, 0)
-	//	for result.Next(ctx) {
-	//		res = append(res, result.Record())
-	//	}
-	//
-	//	return res, result.Err()
-	//})
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//fmt.Printf("深さ: %d\n", deps)
-	//fmt.Printf("脆弱性影響の数: %d\n", len(greeting.([]any)))
-	//fmt.Printf("処理時間: %f s \n\n", time.Since(now).Seconds())
-
 	// サブグラフ削除
 	_, err = session.ExecuteWrite(ctx, func(transaction neo4j.ManagedTransaction) (any, error) {
-		result, err := transaction.Run(ctx,
-			fmt.Sprintf(`CALL gds.graph.drop('%s', false) YIELD graphName`, subGraphName),
-			map[string]any{})
+		queryString := fmt.Sprintf(`CALL gds.graph.drop('%s', false) YIELD graphName`, subGraphName)
+		fmt.Printf("query: =====\n\n %s \n\n ====\n", queryString)
+
+		result, err := transaction.Run(ctx, queryString, map[string]any{})
 		if err != nil {
 			return nil, err
 		}
@@ -70,12 +45,11 @@ func AnalyzeWithGraphDB() error {
 	if err != nil {
 		return err
 	}
-	log.Println("サブグラフ削除完了\n\n")
+	log.Print("サブグラフ削除完了\n\n")
 
 	// サブグラフ作成
 	createSubGraphRes, err := session.ExecuteWrite(ctx, func(transaction neo4j.ManagedTransaction) (any, error) {
-		result, err := transaction.Run(ctx,
-			fmt.Sprintf(`
+		queryString := fmt.Sprintf(`
 	MATCH (from:verison)-[d:dependency*%d..%d]->(to:verison)
 	WHERE to.id="%s"
 	WITH collect(from) as affectedPackageVersions
@@ -91,8 +65,11 @@ func AnalyzeWithGraphDB() error {
 			}
 		) YIELD graphName, nodeCount AS nodes, relationshipCount AS rels
 	RETURN graphName, nodes, rels
-`, deps, deps, vulPackageVersionId, subGraphName),
-			map[string]any{})
+`, deps, deps, vulPackageVersionId, subGraphName)
+
+		fmt.Printf("query: =====\n\n %s \n\n ====\n", queryString)
+
+		result, err := transaction.Run(ctx, queryString, map[string]any{})
 		if err != nil {
 			return nil, err
 		}
