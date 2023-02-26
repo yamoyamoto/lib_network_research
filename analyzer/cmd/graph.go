@@ -6,6 +6,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"log"
 	"strings"
+	"time"
 )
 
 const (
@@ -18,7 +19,6 @@ const (
 )
 
 func AnalyzeWithGraphDB() error {
-	//now := time.Now()
 
 	vulPackageVersionIds := strings.Split(vulPackageVersionIdsString, ";")
 	for i, _ := range vulPackageVersionIds {
@@ -54,7 +54,9 @@ func AnalyzeWithGraphDB() error {
 	log.Print("サブグラフ削除完了\n\n")
 
 	// サブグラフ作成
-	createSubGraphRes, err := session.ExecuteWrite(ctx, func(transaction neo4j.ManagedTransaction) (any, error) {
+	_, err = session.ExecuteWrite(ctx, func(transaction neo4j.ManagedTransaction) (any, error) {
+		now := time.Now()
+
 		queryString := fmt.Sprintf(`
 	MATCH (from:verison)-[d:dependency*%d..%d]->(to:verison)
 	WHERE to.id IN [%s]
@@ -85,15 +87,18 @@ func AnalyzeWithGraphDB() error {
 			res = append(res, result.Record())
 		}
 
+		log.Println("サブグラフ作成完了: ", res[0])
+		log.Println("実行時間: ", time.Since(now).Seconds(), "s")
 		return res, result.Err()
 	})
 	if err != nil {
 		return err
 	}
-	log.Println("サブグラフ作成完了: ", createSubGraphRes.([]interface{})[0])
 
 	// 弱連結成分とともに脆弱性影響を抽出
 	_, err = session.ExecuteWrite(ctx, func(transaction neo4j.ManagedTransaction) (any, error) {
+		now := time.Now()
+
 		result, err := transaction.Run(ctx,
 			fmt.Sprintf(`
 	CALL gds.wcc.stream("%s")
@@ -109,6 +114,9 @@ func AnalyzeWithGraphDB() error {
 		for result.Next(ctx) {
 			res = append(res, result.Record())
 		}
+
+		log.Println("弱連結成分抽出完了: ")
+		log.Println("実行時間: ", time.Since(now).Seconds(), "s")
 
 		return res, result.Err()
 	})
