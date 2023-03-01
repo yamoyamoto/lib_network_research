@@ -134,7 +134,7 @@ func findAffectedPackageVersions(driver neo4j.DriverWithContext, vulPackageId st
 
 	for i, row := range wccComponentsRes.([]interface{}) {
 		r := row.(*neo4j.Record)
-		fmt.Printf("%d,  first version: %s (published at: %s) ==> fixed version: %s (fixed at: %s)\n",
+		fmt.Printf("%d,  introduced version: %s (published at: %s) ==> fixed version: %s (fixed at: %s)\n",
 			i,
 			r.Values[1].(neo4j.Node).Props["number"],
 			r.Values[1].(neo4j.Node).Props["published_timestamp"],
