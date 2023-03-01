@@ -104,11 +104,14 @@ func findAffectedPackageVersions(driver neo4j.DriverWithContext, vulPackageId st
 
 		result, err := transaction.Run(ctx,
 			fmt.Sprintf(`
-						CALL gds.wcc.stream("%s")
-						YIELD nodeId, componentId
-						WITH nodeId, componentId
-						ORDER BY nodeId ASC
-						RETURN componentId, collect(nodeId)
+				CALL gds.wcc.stream("%s")
+				YIELD nodeId, componentId
+				WITH nodeId, componentId
+				ORDER BY nodeId ASC
+				WITH componentId, collect(nodeId) AS wcc_nodes
+				WITH componentId, gds.util.asNode(head(wcc_nodes)) AS start_version, gds.util.asNode(head(reverse(wcc_nodes))) AS end_version
+				MATCH (end_version)-[n:next]->(fixed_version:verison)
+				RETURN componentId, start_version, fixed_version
 					`, subGraphName),
 			map[string]any{})
 		if err != nil {
@@ -131,8 +134,13 @@ func findAffectedPackageVersions(driver neo4j.DriverWithContext, vulPackageId st
 
 	for i, row := range wccComponentsRes.([]interface{}) {
 		r := row.(*neo4j.Record)
-		//log.Println(r.Values[0], r.Values[1].([]interface{}))
-		fmt.Printf("%d, first version: %d\n ==> second version: %d\n", i, r.Values[1].([]interface{})[0], r.Values[1].([]interface{})[len(r.Values[1].([]interface{}))-1])
+		fmt.Printf("%d,  first version: %s (published at: %s) ==> fixed version: %s (fixed at: %s)\n",
+			i,
+			r.Values[1].(neo4j.Node).Props["number"],
+			r.Values[1].(neo4j.Node).Props["published_timestamp"],
+			r.Values[2].(neo4j.Node).Props["number"],
+			r.Values[2].(neo4j.Node).Props["published_timestamp"],
+		)
 
 		if i > 10 {
 			break
