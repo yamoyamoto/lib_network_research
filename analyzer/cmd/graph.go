@@ -147,17 +147,6 @@ func findAffectedPackageVersions(driver neo4j.DriverWithContext, vulPackageId st
 		}
 	}
 
-	//for _, row := range wccComponentsRes.([]interface{}) {
-	//	r := row.(*neo4j.Record)
-	//	log.Printf("source project id:%s(%s) -> affected project id:%s(%s) -> fixed version: %s \n\n",
-	//		r.Values[0].(neo4j.Node).Props["nodeId"],
-	//		r.Values[0].(neo4j.Node).Props["componentId"],
-	//		r.Values[1].(neo4j.Node).Props["package_id"],
-	//		r.Values[1].(neo4j.Node).Props["number"],
-	//		r.Values[2].(neo4j.Node).Props["number"],
-	//	)
-	//}
-
 	return nil, nil
 }
 
@@ -175,28 +164,12 @@ func AnalyzeWithGraphDB() error {
 	}
 	defer driver.Close(ctx)
 
-	affectedPackageVersions, err := findAffectedPackageVersions(driver, "dummy", vulPackageVersionIdsString, "dummy", 2)
+	affectedPackageVersions, err := findAffectedPackageVersions(driver, "dummy", vulPackageVersionIdsString, "dummy", 3)
 	if err != nil {
 		return err
 	}
 
 	log.Println(affectedPackageVersions)
-
-	//for _, row := range wccComponentsRes.([]interface{}) {
-	//	r := row.(*neo4j.Record)
-	//	log.Println(r.Values[0], r.Values[1])
-	//}
-
-	//for _, row := range wccComponentsRes.([]interface{}) {
-	//	r := row.(*neo4j.Record)
-	//	log.Printf("source project id:%s(%s) -> affected project id:%s(%s) -> fixed version: %s \n\n",
-	//		r.Values[0].(neo4j.Node).Props["nodeId"],
-	//		r.Values[0].(neo4j.Node).Props["componentId"],
-	//		r.Values[1].(neo4j.Node).Props["package_id"],
-	//		r.Values[1].(neo4j.Node).Props["number"],
-	//		r.Values[2].(neo4j.Node).Props["number"],
-	//	)
-	//}
 
 	return nil
 }
