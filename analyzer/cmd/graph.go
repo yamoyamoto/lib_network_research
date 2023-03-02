@@ -57,6 +57,36 @@ func findAffectedPackageVersions(driver neo4j.DriverWithContext, vulPackageId st
 	}
 	log.Print("サブグラフ削除完了\n\n")
 
+	//
+	if _, err := session.ExecuteWrite(ctx, func(transaction neo4j.ManagedTransaction) (any, error) {
+		now := time.Now()
+
+		queryString := fmt.Sprintf(`
+		MATCH p = (from:verison)-[d:dependency*%d..%d]->(to:verison)
+		WHERE to.version_id IN [%s]
+		SET from.dependencyRequirement = relationships(p)[%d].dependencyRequirement
+		RETURN from
+	`, deps, deps, strings.Join(vulPackageVersionIds, ","), deps-1)
+
+		fmt.Printf("query: =====\n\n %s \n\n ====\n", queryString)
+
+		result, err := transaction.Run(ctx, queryString, map[string]any{})
+		if err != nil {
+			return nil, err
+		}
+
+		res := make([]any, 0)
+		for result.Next(ctx) {
+			res = append(res, result.Record())
+		}
+
+		//log.Println("サブグラフ作成完了: ", res[0])
+		log.Println("実行時間: ", time.Since(now).Seconds(), "s")
+		return res, result.Err()
+	}); err != nil {
+		return nil, err
+	}
+
 	// サブグラフ作成
 	if _, err := session.ExecuteWrite(ctx, func(transaction neo4j.ManagedTransaction) (any, error) {
 		now := time.Now()
@@ -102,17 +132,22 @@ func findAffectedPackageVersions(driver neo4j.DriverWithContext, vulPackageId st
 	wccComponentsRes, err := session.ExecuteWrite(ctx, func(transaction neo4j.ManagedTransaction) (any, error) {
 		now := time.Now()
 
-		result, err := transaction.Run(ctx,
-			fmt.Sprintf(`
+		queryString := fmt.Sprintf(`
 				CALL gds.wcc.stream("%s")
 				YIELD nodeId, componentId
 				WITH nodeId, componentId
 				ORDER BY nodeId ASC
-				WITH componentId, collect(nodeId) AS wcc_nodes
-				WITH componentId, gds.util.asNode(head(wcc_nodes)) AS start_version, gds.util.asNode(head(reverse(wcc_nodes))) AS end_version
+				WITH componentId, gds.util.asNode(nodeId) AS affected_version
+				WITH componentId, affected_version.dependencyRequirement AS dependencyRequirement, collect(affected_version) AS affected_versions
+				WITH componentId, head(affected_versions) AS start_version, head(reverse(affected_versions)) AS end_version
 				MATCH (end_version)-[n:next]->(fixed_version:verison)
 				RETURN componentId, start_version, fixed_version
-					`, subGraphName),
+					`, subGraphName)
+
+		log.Println(queryString)
+
+		result, err := transaction.Run(ctx,
+			queryString,
 			map[string]any{})
 		if err != nil {
 			return nil, err
@@ -134,8 +169,9 @@ func findAffectedPackageVersions(driver neo4j.DriverWithContext, vulPackageId st
 
 	for i, row := range wccComponentsRes.([]interface{}) {
 		r := row.(*neo4j.Record)
-		fmt.Printf("%d,  introduced version: %s (published at: %s) ==> fixed version: %s (fixed at: %s)\n",
+		fmt.Printf("%d, dependencyRequirement: %s, introduced version: %s (published at: %s) ==> fixed version: %s (fixed at: %s)\n",
 			i,
+			r.Values[1].(neo4j.Node).Props["dependencyRequirement"],
 			r.Values[1].(neo4j.Node).Props["number"],
 			r.Values[1].(neo4j.Node).Props["published_timestamp"],
 			r.Values[2].(neo4j.Node).Props["number"],
@@ -164,7 +200,7 @@ func AnalyzeWithGraphDB() error {
 	}
 	defer driver.Close(ctx)
 
-	affectedPackageVersions, err := findAffectedPackageVersions(driver, "dummy", vulPackageVersionIdsString, "dummy", 3)
+	affectedPackageVersions, err := findAffectedPackageVersions(driver, "dummy", vulPackageVersionIdsString, "dummy", 2)
 	if err != nil {
 		return err
 	}
