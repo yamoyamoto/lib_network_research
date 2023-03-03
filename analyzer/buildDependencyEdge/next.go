@@ -73,7 +73,7 @@ func parseNextEdges() error {
 	}
 	outputWriter := csv.NewWriter(outFile)
 	outputWriter.Write([]string{
-		"id",
+		"next_edge_id",
 		":START_ID",
 		":END_ID",
 		":TYPE",
@@ -81,9 +81,9 @@ func parseNextEdges() error {
 
 	for _, e := range nextEdges {
 		outputWriter.Write([]string{
-			e.Id,
 			e.From,
 			e.To,
+			"",
 			"next",
 		})
 	}
