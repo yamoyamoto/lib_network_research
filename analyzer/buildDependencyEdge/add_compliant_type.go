@@ -73,6 +73,7 @@ func addCompliantType(outputFileName string) error {
 			row[1],
 			row[2],
 			row[3],
+			row[4],
 			fmt.Sprint(parseRow(db, row)),
 		})
 	}
