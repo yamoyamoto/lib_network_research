@@ -26,19 +26,20 @@ type SourceVulRecord struct {
 }
 
 type VulRecord struct {
+	PackageId           string `json:"package_id"`
 	IntroducedVersionId string `json:"introduced_version_id"`
 	FixedVersionId      string `json:"fixed_version_id"`
 	DependencyId        int64  `json:"dependency_id"`
 }
 
 type Neo4jRecord struct {
+	AffectedPackageId            string `json:"affected_package_id"`
 	AffectedPackageVersionId     string `json:"affected_version_id"`
 	AffectedPackageNextVersionId string `json:"affected_version_next_id"`
 	DependencyId                 int64  `json:"dependency_id"`
 }
 
 func AnalyzeWithGraphDB(vulPackageInputFile string) error {
-	// 脆弱性のリスト
 	vulPackagesOutputFile, err := os.Create("test.csv")
 	if err != nil {
 		return err
@@ -70,7 +71,7 @@ func AnalyzeWithGraphDB(vulPackageInputFile string) error {
 				vulPackage.ID,
 				vulPackage.Summary,
 				vulPackage.PackageName,
-				vulPackage.ProjectId,
+				affectedPackageVersion.PackageId,
 				affectedPackageVersion.IntroducedVersionId,
 				affectedPackageVersion.FixedVersionId,
 				strconv.FormatInt(affectedPackageVersion.DependencyId, 10),
@@ -99,10 +100,10 @@ func findAffectedPackageVersions(driver neo4j.DriverWithContext, VulPackageVersi
 		queryString := fmt.Sprintf(`
 MATCH (affected_version:verison)-[dependency*%d..%d]->(affecting_version:verison), (affected_version)-[n:next]->(affected_version_next:verison)
 WHERE affecting_version.version_id IN [%s]
-RETURN DISTINCT affected_version.version_id AS affected_version_id, affected_version_next.version_id AS affected_version_next_id, id(dependency[%d]) AS dependency_id
-ORDER BY dependency_id ASC, affected_version_id ASC;
+RETURN DISTINCT affected_version.package_id AS affected_package_id, affected_version.version_id AS affected_version_id, affected_version_next.version_id AS affected_version_next_id, id(dependency[%d]) AS dependency_id
+ORDER BY affected_package_id ASC, dependency_id ASC, affected_version_id ASC;
 		`, deps, deps, strings.Join(vulPackageVersionIds, ","), deps-1)
-		//fmt.Printf("query: =====\n\n %s \n\n ====\n", queryString)
+		fmt.Printf("query: =====\n\n %s \n\n ====\n", queryString)
 
 		result, err := transaction.Run(ctx, queryString, map[string]any{})
 		if err != nil {
@@ -113,9 +114,10 @@ ORDER BY dependency_id ASC, affected_version_id ASC;
 		for result.Next(ctx) {
 			r := result.Record()
 			records = append(records, Neo4jRecord{
-				AffectedPackageVersionId:     r.Values[0].(string),
-				AffectedPackageNextVersionId: r.Values[1].(string),
-				DependencyId:                 r.Values[2].(int64),
+				AffectedPackageId:            r.Values[0].(string),
+				AffectedPackageVersionId:     r.Values[1].(string),
+				AffectedPackageNextVersionId: r.Values[2].(string),
+				DependencyId:                 r.Values[3].(int64),
 			})
 		}
 
@@ -134,6 +136,7 @@ ORDER BY dependency_id ASC, affected_version_id ASC;
 
 		fixedVersionId, deletingIndexes := findFixedVersion(records)
 		vulRecords = append(vulRecords, VulRecord{
+			PackageId:           records[0].AffectedPackageId,
 			IntroducedVersionId: introducedVersionId,
 			FixedVersionId:      fixedVersionId,
 			DependencyId:        nowDependencyId,
@@ -158,7 +161,7 @@ func findFixedVersion(records []Neo4jRecord) (string, []int) {
 	nextVersionId := introducedRecord.AffectedPackageNextVersionId
 
 	for i, record := range records {
-		// 違う依存関係に差し掛かったらbreak
+		// 違うdependencyIdに差し掛かったらbreak
 		if record.DependencyId != dependencyId {
 			return records[i-1].AffectedPackageNextVersionId, deletingIndexes
 		}
