@@ -44,7 +44,9 @@ func AnalyzeWithGraphDB(vulPackageInputFile string) error {
 		return err
 	}
 	outputFileWriter := csv.NewWriter(vulPackagesOutputFile)
-	writeHeader(outputFileWriter)
+	if err := writeHeader(outputFileWriter); err != nil {
+		return err
+	}
 
 	driver, err := neo4j.NewDriverWithContext(neo4jUri, neo4j.BasicAuth("neo4j", "yamoyamoto", ""))
 	if err != nil {
@@ -64,7 +66,7 @@ func AnalyzeWithGraphDB(vulPackageInputFile string) error {
 			return err
 		}
 		for _, affectedPackageVersion := range affectedPackageVersions {
-			outputFileWriter.Write([]string{
+			if err := outputFileWriter.Write([]string{
 				vulPackage.ID,
 				vulPackage.Summary,
 				vulPackage.PackageName,
@@ -72,7 +74,9 @@ func AnalyzeWithGraphDB(vulPackageInputFile string) error {
 				affectedPackageVersion.IntroducedVersionId,
 				affectedPackageVersion.FixedVersionId,
 				strconv.FormatInt(affectedPackageVersion.DependencyId, 10),
-			})
+			}); err != nil {
+				return err
+			}
 		}
 		outputFileWriter.Flush()
 		break
@@ -184,8 +188,8 @@ func buildSourceVulRecords(rows [][]string) []SourceVulRecord {
 	return vulPackages
 }
 
-func writeHeader(writer *csv.Writer) {
-	writer.Write([]string{
+func writeHeader(writer *csv.Writer) error {
+	return writer.Write([]string{
 		"id",
 		"summary",
 		"package_name",
