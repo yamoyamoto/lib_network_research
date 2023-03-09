@@ -1,9 +1,13 @@
 package main
 
-import "analyzer/cmd"
+import (
+	"analyzer/cmd"
+	"os"
+)
 
 func main() {
-	if err := cmd.AnalyzeWithGraphDB(); err != nil {
+	args := os.Args
+	if err := cmd.AnalyzeWithGraphDB(args[1]); err != nil {
 		panic(err)
 	}
 }
