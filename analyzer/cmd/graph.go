@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"github.com/cheggaaa/pb/v3"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"log"
 	"os"
@@ -67,7 +68,10 @@ func AnalyzeWithGraphDB(vulPackageInputFile string) error {
 		return err
 	}
 
+	bar := pb.Full.Start(len(vulPackages))
 	for _, vulPackage := range vulPackages {
+		bar.Increment()
+
 		log.Println("find affected package versions: ", vulPackage.PackageName)
 		affectedPackageVersions, err := findAffectedPackageVersions(driver, vulPackage.VersionsString, 2)
 		if err != nil {
@@ -93,7 +97,6 @@ func AnalyzeWithGraphDB(vulPackageInputFile string) error {
 			}
 		}
 		outputFileWriter.Flush()
-		break
 	}
 
 	return nil
@@ -124,7 +127,8 @@ WHERE affecting_version.version_id IN [%s]
 RETURN DISTINCT affected_version.package_id AS affected_package_id, affected_version.version_id AS affected_version_id, 
 affected_version_next.version_id AS affected_version_next_id, id(dependency[%d]) AS dependency_id,
 affected_version.published_timestamp AS affected_version_published_timestamp, affected_version_next.published_timestamp AS affected_version_next_published_timestamp
-ORDER BY affected_package_id ASC, dependency_id ASC, affected_version_published_timestamp ASC;
+ORDER BY affected_package_id ASC, dependency_id ASC, affected_version_published_timestamp ASC
+LIMIT 100000;
 		`, deps, deps, strings.Join(vulPackageVersionIds, ","), deps-1)
 		fmt.Printf("query: =====\n\n %s \n\n ====\n", queryString)
 
@@ -145,6 +149,7 @@ ORDER BY affected_package_id ASC, dependency_id ASC, affected_version_published_
 				AffectedPackageNextVersionPublishTimestamp: r.Values[5].(time.Time),
 			})
 		}
+		log.Printf("neo4jレコード数: %d", len(records))
 
 		return records, result.Err()
 	})
@@ -153,9 +158,16 @@ ORDER BY affected_package_id ASC, dependency_id ASC, affected_version_published_
 	}
 
 	records := rs.([]Neo4jRecord)
+
+	if len(records) > 100000 {
+		log.Println("too many records. records count: ", len(records))
+		return nil, nil
+	}
+
 	vulRecords := make([]VulRecord, 0)
 	nowPackageId := ""
 	samePackageVulRecords := make([]VulRecord, 0)
+
 	for len(records) != 0 {
 		if records[0].AffectedPackageId != nowPackageId {
 			// TODO: リフレッシュ
@@ -185,12 +197,12 @@ ORDER BY affected_package_id ASC, dependency_id ASC, affected_version_published_
 		}
 
 		samePackageVulRecords = append(samePackageVulRecords, vukRecord)
-		records = records[1:]
 
 		// すでに調べた要素は削除(indexずれるので後ろから消す)
 		for i := len(deletingIndexes) - 1; i >= 0; i-- {
 			records = append(records[:deletingIndexes[i]], records[deletingIndexes[i]+1:]...)
 		}
+		records = records[1:]
 	}
 
 	log.Printf("脆弱性レコード数: %d", len(vulRecords))
